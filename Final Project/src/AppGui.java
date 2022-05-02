@@ -1,4 +1,3 @@
-import javafx.scene.layout.Border;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -16,6 +15,8 @@ public class AppGui extends JFrame{
     private DefaultListModel model;
     private JScrollPane scrollPane;
     private JScrollPane scrollPane1;
+    JLabel label2;
+    Boolean loggedIn = false;
 
 
 
@@ -84,16 +85,66 @@ public class AppGui extends JFrame{
             @Override
             public void actionPerformed(ActionEvent e) {
                 // TODO Auto-generated method stub
-                if(true){
+                DBdemo DB = new DBdemo();
+                Boolean result = DB.checkUser(userName1.getText(), passWord1.getText());
+                System.out.println(result);
+                if(result && !loggedIn){
                     JOptionPane.showMessageDialog(null, "Successfully login",
                             null, JOptionPane.PLAIN_MESSAGE);
+                    loggedIn = true;
+                    label2.setText("Welcome: " + userName1.getText());
+                    label2.setVisible(true);
                 }
                 else{
-                    JOptionPane.showMessageDialog(null, "No such an account, please register a new account",
-                            null, JOptionPane.PLAIN_MESSAGE);
+                    if (loggedIn) {
+                        JOptionPane.showMessageDialog(null, "Aleady Logged In",
+                                null, JOptionPane.PLAIN_MESSAGE);
+                    }
+                    else {
+                        JOptionPane.showMessageDialog(null, "No such an account, please register a new account",
+                                null, JOptionPane.PLAIN_MESSAGE);
+                    }
+
                 }
             }
-    });
+
+
+
+        });
+        register.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // TODO Auto-generated method stub
+                DBdemo DB = new DBdemo();
+                Boolean result = DB.checkUser(userName1.getText(), passWord1.getText());
+                System.out.println(result);
+                if(!result && !loggedIn){
+                    DB.register(userName1.getText(), passWord1.getText());
+                    JOptionPane.showMessageDialog(null, "Successfully registered",
+                            null, JOptionPane.PLAIN_MESSAGE);
+                    loggedIn = true;
+                    label2.setText("Welcome: " + userName1.getText());
+                }
+                else{
+                    if (loggedIn) {
+                        JOptionPane.showMessageDialog(null, "Aleady Logged In",
+                                null, JOptionPane.PLAIN_MESSAGE);
+                    }
+                    else {
+                        JOptionPane.showMessageDialog(null, "You have registered already, please Log in",
+                                null, JOptionPane.PLAIN_MESSAGE);
+                    }
+
+                }
+            }
+
+
+
+        });
+
+
+
+
     }
     private void OderMenus(){
         scrollPane = new JScrollPane();
@@ -309,16 +360,10 @@ public class AppGui extends JFrame{
         JMenuBar menuBar = new JMenuBar();
         setJMenuBar(menuBar);
         menuBar.add(createOptionMenu());
-        JLabel label2 = new JLabel("Welcome:Username.....");
-        if(false){
-            setJMenuBar(menuBar);
-            menuBar.add(Box.createHorizontalGlue());
-            menuBar.add(label2);
-
-        }
-        else{
-            label2.setVisible(false);
-        }
+        label2 = new JLabel("Welcome:");
+        setJMenuBar(menuBar);
+        menuBar.add(Box.createHorizontalGlue());
+        menuBar.add(label2);
 
     }
     private void OrderCheck(){
@@ -397,9 +442,3 @@ public class AppGui extends JFrame{
         a.setVisible(true);
     }
 }
-
-
-
-
-
-

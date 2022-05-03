@@ -2,6 +2,10 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
 import javax.swing.ImageIcon;
 
 public class AppGui extends JFrame{
@@ -10,13 +14,16 @@ public class AppGui extends JFrame{
     private JPanel botPanel;
     JList list;
     private JLabel label;
-    private JTextField field;
-    private JButton button;
+    private JTextArea chatField;
+    private  JTextField sendText;
     private DefaultListModel model;
     private JScrollPane scrollPane;
     private JScrollPane scrollPane1;
     JLabel label2;
     Boolean loggedIn = false;
+    Socket socket;
+    DataOutputStream toServer = null;
+    DataInputStream fromServer = null;
 
 
 
@@ -54,9 +61,9 @@ public class AppGui extends JFrame{
         add(centerPanel,BorderLayout.CENTER);
         add(botPanel,BorderLayout.SOUTH);
         OderMenus();
-        chatField();
+        createChatField();
         OrderCheck();
-        textCheck();
+        textSend();
 
 
         setVisible(true);
@@ -337,16 +344,19 @@ public class AppGui extends JFrame{
     }
 
 
-    private void chatField(){
+    private void createChatField(){
+        chatField = new JTextArea();
+        chatField.setCaretPosition(0);
+        chatField.setEditable(false);
         JPanel chatPanel = new JPanel();
         chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
-        JTextArea chatField = new JTextArea();
         scrollPane1 = new JScrollPane(chatField);
         scrollPane1.setPreferredSize(new Dimension(350,580));
         chatPanel.add(scrollPane1);
-        JTextField sendText = new JTextField();
+        sendText = new JTextField();
         sendText.setPreferredSize(new Dimension(350,70));
-        chatPanel.add(sendText);
+        ChatClient chating = new ChatClient();
+        chatPanel.add(chating.textField());
         centerPanel.add(chatPanel);
 
     }
@@ -394,10 +404,34 @@ public class AppGui extends JFrame{
 
     }
 
-    private void textCheck(){
+    private void textSend(){
         JPanel textPanel = new JPanel();
         JButton textCheck = new JButton("send");
         textCheck.setPreferredSize(new Dimension(200,50));
+        class ButtonListener implements ActionListener {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+
+                    toServer = new DataOutputStream(socket.getOutputStream());
+                }
+                catch (IOException ex) {
+                    chatField.append(ex.toString() + '\n');
+                }
+
+                try {
+                    String sentMessage = sendText.getText();
+//                    chatField.append("id:"+sentMessage+"\n");
+                    toServer.writeUTF(sentMessage);
+                    toServer.flush();
+                }
+                catch (IOException ex) {
+                    System.err.println(ex);
+                }
+                sendText.setText("");
+            }
+        }
+        textCheck.addActionListener(new ButtonListener());
         textPanel.add(textCheck);
         botPanel.add(textPanel,LEFT_ALIGNMENT);
 
@@ -427,12 +461,106 @@ public class AppGui extends JFrame{
     }
 
     private JMenuItem createConnectItem() {
-        JMenuItem item = new JMenuItem("Connect");
-        //make a connection with server;So they can chat with server;
+        JMenuItem connect = new JMenuItem("Connect");
+        class OpenConnectionListener implements ActionListener {
 
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // TODO Auto-generated method stub
+                try {
+                    socket = new Socket("localhost", 8000);
+                    chatField.append("connected" + "\n");
+                    fromServer = new DataInputStream(socket.getInputStream());
+                    new Thread(new HandleServer(fromServer)).start();
+                } catch (IOException e1) {
+                    // TODO Auto-generated catch block
+                    e1.printStackTrace();
+                    chatField.append("connection Failure");
+                }
+            }
 
-        return item;
+        }
+        ActionListener listener = new OpenConnectionListener();
+        connect.addActionListener(listener);
+        return connect;
     }
+
+    class HandleServer implements Runnable {
+        private DataInputStream data; // A connected socket
+
+        /** Construct a thread */
+        public HandleServer(DataInputStream data) {
+            this.data = data;
+        }
+
+        /** Run a thread */
+        public void run() {
+            try {
+                while (true) {
+                    String receivedMessage = data.readUTF();
+                    chatField.append(receivedMessage + '\n');
+
+                }
+            }
+            catch(IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    class ChatClient extends JFrame implements Runnable{
+        String host = "localhost";
+        public ChatClient(){
+            Thread t = new Thread(this);
+            t.start();
+
+        }
+        public JTextField textField() {
+            class TextFieldListener implements ActionListener {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    try {
+
+                        toServer = new DataOutputStream(socket.getOutputStream());
+                    }
+                    catch (IOException ex) {
+                        chatField.append(ex.toString() + '\n');
+                    }
+
+                    try {
+                        String sentMessage = sendText.getText();
+//                        chatField.append("id:"+sentMessage+"\n");
+                        toServer.writeUTF(sentMessage);
+                        toServer.flush();
+                    }
+                    catch (IOException ex) {
+                        System.err.println(ex);
+                    }
+                    sendText.setText("");
+                }
+            }
+            sendText.addActionListener(new TextFieldListener());
+            return sendText;
+        }
+
+
+
+
+        @Override
+        public void run() {
+            try {
+                if(socket != null) {
+                    fromServer = new DataInputStream(socket.getInputStream());
+                    new Thread(new HandleServer(fromServer)).start();
+                }
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+    }
+
+
 
 
 

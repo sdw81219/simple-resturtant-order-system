@@ -10,6 +10,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Date;
+import java.awt.BorderLayout;
+
 
 import javax.swing.*;
 
@@ -19,13 +21,15 @@ public class MerchantApp extends JFrame {
     private JPanel botPanel;
     JList list;
     private JLabel label;
-    private JTextField field;
     private JButton button;
     private DefaultListModel model;
     private JScrollPane scrollPane;
     private JScrollPane scrollPane1;
-
+    Socket socket;
     private JTextArea chatField;
+    private JTextField sendText;
+    DataOutputStream toServer = null;
+    DataInputStream fromServer = null;
 
 
 
@@ -34,10 +38,6 @@ public class MerchantApp extends JFrame {
 
         setTitle("Merchant System");
         this.setSize(800, 1000);
-
-//        JPanel panelForTextFields = new JPanel();
-//        panelForTextFields.setSize(400, 850);
-
 
         //panel at the top
         topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -51,17 +51,16 @@ public class MerchantApp extends JFrame {
         model = new DefaultListModel();
         list = new JList(model);
 
-
 //        panelForTextFields.add(scrollPane);
         add(topPanel, BorderLayout.NORTH);
         add(centerPanel, BorderLayout.CENTER);
         add(botPanel, BorderLayout.SOUTH);
-
         setVisible(true);
 
         addToList();
         waitingList();
         chatField();
+
 
     }
 
@@ -103,6 +102,7 @@ public class MerchantApp extends JFrame {
     }
 
     private void chatField() {
+        chatField = new JTextArea();
         chatField.setCaretPosition(0);
         chatField.setEditable(false);
         JPanel chatPanel = new JPanel();
@@ -110,16 +110,14 @@ public class MerchantApp extends JFrame {
         scrollPane1 = new JScrollPane(chatField);
         scrollPane1.setPreferredSize(new Dimension(350, 580));
         chatPanel.add(scrollPane1);
-        JTextArea sendText = new JTextArea();
+        sendText = new JTextField();
         sendText.setPreferredSize(new Dimension(350, 70));
-        chatPanel.add(sendText);
+        chatServer chating = new chatServer();
+        chatPanel.add(chating.textField());
         centerPanel.add(chatPanel);
-
     }
-    class chatServer implements Runnable {
+    class chatServer extends JFrame implements Runnable {
         ArrayList<Socket> list = new ArrayList<>();
-        JTextArea Display;
-        ServerSocket serverSocket;
         private int clientNo = 0;
 
 
@@ -131,7 +129,6 @@ public class MerchantApp extends JFrame {
 
         @Override
         public void run() {
-
             try {
                 // Create a server socket
                 ServerSocket serverSocket = new ServerSocket(8000);
@@ -141,7 +138,7 @@ public class MerchantApp extends JFrame {
                 while (true) {
 
                     // Listen for a new connection request
-                    Socket socket = serverSocket.accept();
+                    socket = serverSocket.accept();
 
                     // Increment clientNo
                     clientNo++;
@@ -158,14 +155,14 @@ public class MerchantApp extends JFrame {
                     // Create and start a new thread for the connection
                     new Thread(new HandleAClient(socket, clientNo)).start();
                 }
-            } catch (IOException ex) {
+            }
+            catch(IOException ex) {
                 System.err.println(ex);
             }
 
+
+
         }
-
-
-        // Define the thread class for handling new connection
         class HandleAClient implements Runnable {
             private Socket socket; // A connected socket
             private int clientNum;
@@ -209,19 +206,56 @@ public class MerchantApp extends JFrame {
 
                         chatField.append("message sent by client" + this.clientNum + ": " +
                                 message + '\n');
+
                     }
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
             }
         }
+        // Define the thread class for handling new connection
+        public JTextField textField() {
+            class TextFieldListener implements ActionListener {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    try {
+
+                        toServer = new DataOutputStream(socket.getOutputStream());
+                    }
+                    catch (IOException ex) {
+                        chatField.append(ex.toString() + '\n');
+                    }
+
+                    try {
+
+                            String sentMessage = "Merchant: "+ sendText.getText();
+                            synchronized (list) {
+                                for (Socket x : list) {
+                                    try {
+                                        DataOutputStream out = new DataOutputStream(
+                                                x.getOutputStream());
+                                        out.writeUTF(sentMessage);
+                                    } catch (IOException ex) {
+                                        ex.printStackTrace();
+                                    }
+                                }
+                            }
+                            chatField.append(sentMessage+'\n');
+//                            toServer.writeUTF(sentMessage);
+                            toServer.flush();
+                    }
+                    catch (IOException ex) {
+                        System.err.println(ex);
+                    }
+                    sendText.setText(" ");
+                }
+            }
+            sendText.addActionListener(new TextFieldListener());
+            return sendText;
+        }
     }
-    chatServer newClient = new chatServer();
 
-
-
-
-    public static void main (String[]agrs){
+    public static void main (String[]args){
         MerchantApp a = new MerchantApp();
         a.setVisible(true);
     }

@@ -1,13 +1,19 @@
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableModel;
+
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.print.PrinterException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.awt.BorderLayout;
@@ -26,10 +32,17 @@ public class MerchantApp extends JFrame {
     private JScrollPane scrollPane;
     private JScrollPane scrollPane1;
     Socket socket;
+    private String userName;
     private JTextArea chatField;
     private JTextField sendText;
+    private int curPos = 1;
+    
+    private Object[][] row = new Object[20][5];    
     DataOutputStream toServer = null;
     DataInputStream fromServer = null;
+    JTable table;
+    DefaultTableModel tempModel;
+    String columns[] = {"Current Position" , "User ID", "Status", "Customer Name"};
 
 
 
@@ -82,24 +95,73 @@ public class MerchantApp extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 // TODO Auto-generated method stub
-
+            	DBdemo DB = new DBdemo();
+            	Boolean result = DB.addWaitList(userName1.getText(), Integer.parseInt(passWord1.getText()));
+            	if(result) {
+            		System.out.print("table size: ");
+            		System.out.println(table.getRowCount());
+            		Object[] newRow = {table.getRowCount() + 1, Integer.parseInt(passWord1.getText()), "Waiting", userName1.getText()};
+            		tempModel.addRow(newRow);
+            		table.setModel(tempModel);
+            		curPos ++;
+            		JOptionPane.showMessageDialog(null, "User added to waiting List",
+                            null, JOptionPane.PLAIN_MESSAGE);
+            		userName1.setText("");
+            		passWord1.setText("");
+            		
+            	}else {
+            		JOptionPane.showMessageDialog(null, "User already in waiting list or no such user",
+                            null, JOptionPane.PLAIN_MESSAGE);
+            	}
+            	
+            	
             }
         });
     }
 
 
     private void waitingList() {
-        scrollPane = new JScrollPane();
-        scrollPane.setPreferredSize(new Dimension(400, 650));
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        JPanel menusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        menusPanel.setLayout(new BoxLayout(menusPanel, BoxLayout.Y_AXIS));
+    	DBdemo DB = new DBdemo();
+    	ResultSet result = DB.getWaitList();
+    	int count = 0;
+    	tempModel = new DefaultTableModel();
+        tempModel.setColumnIdentifiers(columns);
+    	try {
+			while(result.next()) {
+				int pos = result.getInt("cur_pos");
+				int id = result.getInt("customer_id");
+				String cusName = result.getString("customer_name");
+				String status = result.getString("status");
+				
+        		Object[] newRow = {pos, id, status, cusName};
+//        		
+//				row[count][0] = pos;
+//				row[count][1] = id;
+//				row[count][2] = cusName;
+//				row[count][3] = status;
+				System.out.println(result.getInt("cur_pos"));
+				count ++;
+				curPos ++;
+				tempModel.addRow(newRow);
+			}
+			
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 
-
-        scrollPane.setViewportView(menusPanel);
+        table = new JTable(tempModel);
+        table.setPreferredSize(new Dimension(400,650));
+        JPanel tablePanel = new JPanel();
+        tablePanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        scrollPane = new JScrollPane(table, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+        scrollPane.setPreferredSize(new Dimension(400,650));
         centerPanel.add(scrollPane);
 
     }
+    
+    
+    
 
     private void chatField() {
         chatField = new JTextArea();
@@ -140,6 +202,12 @@ public class MerchantApp extends JFrame {
                     // Listen for a new connection request
                     socket = serverSocket.accept();
 
+                    
+                    DataInputStream inputFromClient = new DataInputStream(
+                            socket.getInputStream());
+                    userName = inputFromClient.readUTF();
+                    
+                    
                     // Increment clientNo
                     clientNo++;
 
@@ -149,11 +217,11 @@ public class MerchantApp extends JFrame {
                     // Find the client's host name, and IP address
                     InetAddress inetAddress = socket.getInetAddress();
                     chatField.append("Client " + clientNo + "'s host name is "
-                            + inetAddress.getHostName() + "\n");
+                            + userName + "\n");
                     chatField.append("Client " + clientNo + "'s IP Address is "
                             + inetAddress.getHostAddress() + "\n");
                     // Create and start a new thread for the connection
-                    new Thread(new HandleAClient(socket, clientNo)).start();
+                    new Thread(new HandleAClient(socket, clientNo, userName)).start();
                 }
             }
             catch(IOException ex) {
@@ -166,13 +234,15 @@ public class MerchantApp extends JFrame {
         class HandleAClient implements Runnable {
             private Socket socket; // A connected socket
             private int clientNum;
+            private String clientName;
 
             /**
              * Construct a thread
              */
-            public HandleAClient(Socket socket, int clientNum) {
+            public HandleAClient(Socket socket, int clientNum, String clientName) {
                 this.socket = socket;
                 this.clientNum = clientNum;
+                this.clientName = clientName;
                 synchronized (list) {
                     list.add(socket);
                 }
@@ -204,7 +274,7 @@ public class MerchantApp extends JFrame {
                             }
                         }
 
-                        chatField.append("message sent by client" + this.clientNum + ": " +
+                        chatField.append("message sent by client :" + this.clientName + ": " +
                                 message + '\n');
 
                     }
